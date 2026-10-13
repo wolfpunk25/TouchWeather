@@ -15,14 +15,14 @@ up is larger. The switches are Daisy's Switch3 positions.
 struct PanelInput {
     /* The eight analog inputs, in the order they sit on A0..A7. */
     enum Knob: uint8_t {
-        KnobWind,       // A0
-        KnobRain,       // A1
-        KnobThunder,    // A2
-        KnobOcean,      // A3
-        KnobDrone,      // A4
-        KnobMotion,     // A5
-        FaderReverb,    // A6 - left fader
-        FaderVolume,    // A7 - right fader
+        KnobDrone,      // A0 - P1, below P2
+        KnobWind,       // A1 - P2
+        KnobRain,       // A2 - P3
+        KnobThunder,    // A3 - P4
+        KnobOcean,      // A4 - P5
+        KnobMotion,     // A5 - P6, below P5
+        FaderReverb,    // A6 - S1, left slider
+        FaderVolume,    // A7 - S2, right slider
         KnobCount
     };
 

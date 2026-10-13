@@ -19,7 +19,7 @@ static Audio play(const Scene& s, const bool played)
     engine.init(kSr, kBlock);
     tw::WeatherUI ui(engine);
     PanelInput in;
-    in.knob = { s.wind, s.rain, s.thunder, s.ocean, s.drone, s.motion, s.reverb, s.volume };
+    in.knob = { s.drone, s.wind, s.rain, s.thunder, s.ocean, s.motion, s.reverb, s.volume };
     in.sw[0] = s.scale == 0 ? PanelInput::SwUp : s.scale == 2 ? PanelInput::SwDown : PanelInput::SwCentre;
     in.sw[1] = s.octave > 0 ? PanelInput::SwUp : s.octave < 0 ? PanelInput::SwDown : PanelInput::SwCentre;
     ui.init(in);

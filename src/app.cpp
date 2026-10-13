@@ -41,6 +41,8 @@ private:
     CpuLoadMeter _cpu;
     uint32_t     _log_t { 0 };
     uint16_t     _last_pads { 0 };
+    GPIO         _scan[32];
+    uint32_t     _scan_valid { 0 }, _last_scan { 0xffffffff };
 #endif
 };
 
@@ -82,6 +84,15 @@ void AppImpl::Init()
     System::Delay(1500);   // give the host time to open the port
     _hw.PrintLine("[app] TouchWeather, debug build");
     _cpu.Init(_hw.AudioSampleRate(), kBlock);
+
+    // Pin scanner: every free digital header pin as a pulled-up input, so the
+    // switches can be found by flipping them. Skips the pins the board uses
+    // (I2C D11/D12, ADC D15-D22) and USB (D29/D30).
+    for (int d = 0; d <= 28; d++) {
+        if (d == 11 || d == 12 || (d >= 15 && d <= 22)) continue;
+        _scan[d].Init(_hw.GetPin(d), GPIO::Mode::INPUT, GPIO::Pull::PULLUP);
+        _scan_valid |= 1u << d;
+    }
 #endif
 
     _hw.StartAudio(AudioCallback);
@@ -135,11 +146,18 @@ void AppImpl::_log()
         _last_pads = pads;
     }
 
+    uint32_t scan = 0;
+    for (int d = 0; d <= 28; d++) if ((_scan_valid >> d) & 1 && _scan[d].Read()) scan |= 1u << d;
+    if (scan != _last_scan) {
+        _hw.PrintLine("[gpio] high 0x%08x  (changed 0x%08x)", static_cast<unsigned>(scan), static_cast<unsigned>(scan ^ _last_scan));
+        _last_scan = scan;
+    }
+
     const auto now = System::GetNow();
     if (now - _log_t < 1000) return;
     _log_t = now;
 
-    _hw.PrintLine("[panel] sw %d/%d pads_ok %d | wind %d rain %d thunder %d ocean %d drone %d motion %d | rev %d vol %d",
+    _hw.PrintLine("[panel] swA %d swB %d pads_ok %d | A0/P1 %d A1/P2 %d A2/P3 %d A3/P4 %d A4/P5 %d A5/P6 %d | A6/S1 %d A7/S2 %d",
         _panel.sw[0], _panel.sw[1], static_cast<int>(_panel.pads_ok),
         static_cast<int>(_panel.knob[0] * 1000), static_cast<int>(_panel.knob[1] * 1000),
         static_cast<int>(_panel.knob[2] * 1000), static_cast<int>(_panel.knob[3] * 1000),
