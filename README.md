@@ -38,6 +38,18 @@ Knobs are named by the faceplate: P2-P5 across the top are the four weather
 knobs, P1 (below P2) is drone and P6 (below P5) is motion; S1 and S2 are the
 sliders. All checked against the board with the DEBUG log.
 
+## Just flash it
+
+`release/touchweather.bin` is a ready-built firmware. Put the Seed in DFU mode
+(hold BOOT, tap RESET) and load it with the
+[Daisy Web Programmer](https://electro-smith.github.io/Programmer/), or:
+
+```bash
+dfu-util -a 0 -s 0x08000000:leave -D release/touchweather.bin -d ,0483:df11
+```
+
+It is rebuilt from `main` by hand, so it may lag the source by a commit.
+
 ## Build and flash
 
 Needs the ARM GNU toolchain and `dfu-util` on `PATH`.
