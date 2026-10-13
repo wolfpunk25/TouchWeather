@@ -13,19 +13,19 @@ synthesised (no samples), written from scratch as portable header-only C++ in
 
 | Control | Does |
 | --- | --- |
-| Knob 1 (A0) | **Wind**: level, pitch and how gusty |
-| Knob 2 (A1) | **Rain**: from a few drops a second to a downpour |
-| Knob 3 (A2) | **Thunder**: from a distant bed of rumble to frequent, close strikes. The LED flashes with the lightning |
-| Knob 4 (A3) | **Ocean**: two layers of surf on unrelated clocks, brightening as each wave breaks |
-| Knob 5 (A4) | **Drone**: level, and with it brightness |
-| Knob 6 (A5) | **Motion**: how far the weather wanders on its own (0 = exactly as set) |
-| Left fader (A6) | **Reverb**: wet amount and tail length (1.5 s up to ~12 s) |
-| Right fader (A7) | **Volume** |
+| P2 (A1) | **Wind**: level, pitch and how gusty |
+| P3 (A2) | **Rain**: from a few drops a second to a downpour |
+| P4 (A3) | **Thunder**: from a distant bed of rumble to frequent, close strikes. The LED flashes with the lightning |
+| P5 (A4) | **Ocean**: two layers of surf on unrelated clocks, brightening as each wave breaks |
+| P1 (A0) | **Drone**: level, and with it brightness |
+| P6 (A5) | **Motion**: how far the weather wanders on its own (0 = exactly as set) |
+| S1, left slider (A6) | **Reverb**: wet amount and tail length (1.5 s up to ~12 s) |
+| S2, right slider (A7) | **Volume** |
 | Switch A | scale: **up** major pentatonic (bright), **centre** minor pentatonic (dark), **down** suspended |
 | Switch B | register: **up** +1 octave, **centre** mid, **down** -1 octave |
-| Pads 1-10 | latch drone notes (tap to add, tap again to fade). Two octaves of the scale, from the root |
-| Pad 11 | **release all** notes |
-| Pad 12 | **shift**: hold it and tap pads 1-11 to set the root (C, C#, D ... A#) |
+| Pads P00-P09 | latch drone notes (tap to add, tap again to fade). Two octaves of the scale, from the root |
+| P10 / P11 (the two small pads at the top) | root **down / up** a semitone |
+| P10 + P11 held together (~0.6 s) | **release all** notes |
 
 It starts on D with a root and fifth already sounding. Held notes glide to a new
 root, scale or register rather than jumping. Five-note scales only, so any
@@ -34,9 +34,9 @@ combination of pads sounds like a chord.
 The Seed's LED shows lightning, a faint glow that swells with the surf, and a
 blink for every pad.
 
-**Knob numbers follow the Seed's pins (A0-A7); faceplate labels differ between
-boards.** If a fader runs backwards, or the pads aren't in the order above, see
-[Hardware to check](#hardware-to-check).
+Knobs are named by the faceplate: P2-P5 across the top are the four weather
+knobs, P1 (below P2) is drone and P6 (below P5) is motion; S1 and S2 are the
+sliders. All checked against the board with the DEBUG log.
 
 ## Build and flash
 
@@ -65,15 +65,13 @@ The scenes drive the real UI and engine, so they are the firmware's sound.
 
 ## Hardware to check
 
-Not yet flashed or heard on the board.
+1. **Slider direction.** S1 reads 0 and S2 reads 1000 untouched; if a slider runs
+   backwards, set its entry in `kInvert` in `src/ui/layout.h`.
+2. **CPU.** `make DEBUG=1` logs load once a second (about 30% with two notes and
+   mid-position knobs). Worst case is not measured on the board.
 
-1. **Pad order.** `make DEBUG=1`, open the Seed's USB serial port, touch each pad: it
-   prints the electrode number. Put them in `kPad` in `src/ui/layout.h`.
-2. **Fader direction.** If a fader reads backwards, set its entry in `kInvert` in
-   the same file.
-3. **CPU.** The debug log prints average and peak load once a second. The worst
-   case (everything up, ten pads) is 80x real time on an M-series Mac, which
-   should be comfortable at 480 MHz but has not been measured on the Seed.
+`make DEBUG=1` also logs every pad as it is touched, the panel, and every digital
+header pin that changes, which is how the layout above was confirmed.
 
 ## Layout
 

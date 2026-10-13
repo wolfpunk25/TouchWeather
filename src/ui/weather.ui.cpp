@@ -8,7 +8,7 @@ void WeatherUI::init(const PanelInput& in)
 {
     _apply_tuning(in);
     _user = (1u << 0) | (1u << 3);   // root and fifth: an open drone out of the box
-    _prev_seen = in.pads_seen | in.pads;
+    _down = 0;
     _push();
 }
 
@@ -33,26 +33,48 @@ void WeatherUI::_push()
     _engine.drone().set(_user | _ghost, _tuning);
 }
 
-void WeatherUI::_pad(const int role, const bool shift)
+void WeatherUI::_tap(const int role)
 {
     _blink = .8f;
-    if (role == layout::kRoleShift) return;
+    const uint16_t bit = 1u << role;
+    if (_ghost & bit) _ghost &= ~bit;   // tapping a ghost sends it away
+    else _user ^= bit;
+    _push();
+}
 
-    if (shift) {
-        _tuning.root = role;   // pads 0..10 -> C..A#
-        _push();
-        return;
+void WeatherUI::_pads(const PanelInput& in, const float dt)
+{
+    uint16_t held = 0, seen = 0;
+    for (int r = 0; r < layout::kRoles; r++) {
+        const uint16_t e = 1u << layout::kPad[r];
+        if (in.pads & e) held |= 1u << r;
+        if ((in.pads | in.pads_seen) & e) seen |= 1u << r;
     }
-    if (role == layout::kRoleClear) {
-        _user = 0;
-        _ghost = 0;
+    const uint16_t rising = seen & ~_down;
+
+    for (int r = 0; r < layout::kNotePads; r++) {
+        if (rising & (1u << r)) _tap(r);
+    }
+    if (rising & (1u << layout::kRoleRootDown)) { _tuning.root = (_tuning.root + 11) % 12; _blink = .8f; _push(); }
+    if (rising & (1u << layout::kRoleRootUp))   { _tuning.root = (_tuning.root + 1) % 12;  _blink = .8f; _push(); }
+
+    // Both root pads, held: let everything go.
+    constexpr uint16_t kBoth = (1u << layout::kRoleRootDown) | (1u << layout::kRoleRootUp);
+    if ((held & kBoth) == kBoth) {
+        _clear_t += dt;
+        if (_clear_t >= layout::kClearHold && !_cleared) {
+            _user = 0;
+            _ghost = 0;
+            _cleared = true;
+            _blink = 1.f;
+            _push();
+        }
     }
     else {
-        const uint16_t bit = 1u << role;
-        if (_ghost & bit) _ghost &= ~bit;   // tapping a ghost sends it away
-        else _user ^= bit;
+        _clear_t = 0.f;
+        _cleared = false;
     }
-    _push();
+    _down = held;
 }
 
 void WeatherUI::_ghosts(const float dt, const float motion)
@@ -112,20 +134,8 @@ void WeatherUI::poll(const PanelInput& in, const float dt)
 
     bool dirty = _tuning.scale != before.scale || _tuning.octave != before.octave;
 
-    if (in.pads_ok) {
-        // A pad counts as touched if it was held at any point since the last poll.
-        const uint16_t seen = in.pads_seen | in.pads;
-        const uint16_t rising = seen & ~_prev_seen;
-        _prev_seen = seen;
-
-        const bool shift = seen & (1u << layout::kPad[layout::kRoleShift]);
-        for (int role = 0; role < layout::kRoles; role++) {
-            if (rising & (1u << layout::kPad[role])) _pad(role, shift);
-        }
-    }
-    else {
-        _prev_seen = 0;
-    }
+    if (in.pads_ok) _pads(in, dt);
+    else { _down = 0; _clear_t = 0.f; _cleared = false; }
 
     if (dirty) _push();
     _ghosts(dt, p.motion);

@@ -30,6 +30,8 @@ struct Rig {
     }
 };
 
+constexpr uint16_t kRootPads = (1u << 10) | (1u << 11);
+
 void pads()
 {
     std::printf("-- pads\n");
@@ -51,55 +53,85 @@ void pads()
     t.hold(7, 2000);
     CHECK(t.ui.latched() == 0b10001001);
 
-    t.hold(10);   // clear
-    CHECK(t.ui.latched() == 0);
-    t.hold(1);
-    CHECK(t.ui.latched() == 0b10);
+    // Two note pads at once are two notes.
+    t.in.pads = (1u << 4) | (1u << 6); t.poll(20); t.in.pads = 0; t.poll(20);
+    CHECK(t.ui.latched() == 0b11011001);
+
+    // The pads at both ends of the row are notes like any other.
+    t.hold(0); t.hold(9);
+    CHECK(t.ui.latched() == 0b1011011000);
 }
 
-void shift_and_switches()
+void root_and_clear()
 {
-    std::printf("-- shift, scale and register\n");
+    std::printf("-- root pads and clear\n");
+    {
+        Rig t;
+        CHECK(t.ui.tuning().root == 2);
+        t.hold(11); CHECK(t.ui.tuning().root == 3);
+        t.hold(11); CHECK(t.ui.tuning().root == 4);
+        t.hold(10); CHECK(t.ui.tuning().root == 3);
+        t.quick_tap(10); CHECK(t.ui.tuning().root == 2);
+        CHECK(t.ui.latched() == 0b1001);   // root pads never latch a note
+
+        for (int i = 0; i < 3; i++) t.hold(10);
+        CHECK(t.ui.tuning().root == 11);   // 2 - 3 wraps below C
+        for (int i = 0; i < 2; i++) t.hold(11);
+        CHECK(t.ui.tuning().root == 1);    // and above B
+    }
+    {
+        // Held together, they cancel out and then clear everything.
+        Rig t;
+        t.hold(4);
+        CHECK(t.ui.latched() == 0b11001);
+        t.in.pads = kRootPads; t.poll(100);
+        CHECK(t.ui.tuning().root == 2);
+        CHECK(t.ui.latched() == 0b11001);  // not yet
+        t.poll(600);
+        CHECK(t.ui.latched() == 0);
+        t.in.pads = 0; t.poll(20);
+        CHECK(t.ui.latched() == 0);
+        t.hold(1);
+        CHECK(t.ui.latched() == 0b10);
+        // And again, on a second hold.
+        t.in.pads = kRootPads; t.poll(800); t.in.pads = 0; t.poll(20);
+        CHECK(t.ui.latched() == 0);
+    }
+    {
+        // Held one at a time, however long, never clears.
+        Rig t;
+        t.in.pads = 1u << 10; t.poll(3000); t.in.pads = 0; t.poll(20);
+        CHECK(t.ui.latched() == 0b1001);
+    }
+    {
+        // A short touch of both is not a clear.
+        Rig t;
+        t.in.pads = kRootPads; t.poll(100); t.in.pads = 0; t.poll(20);
+        CHECK(t.ui.latched() == 0b1001);
+        CHECK(t.ui.tuning().root == 2);
+    }
+}
+
+void switches()
+{
+    std::printf("-- scale, register and the drone following the root\n");
     Rig t;
-    CHECK(t.ui.tuning().root == 2);
-
-    // Shift alone does nothing audible.
-    t.hold(11);
-    CHECK(t.ui.latched() == 0b1001);
-    CHECK(t.ui.tuning().root == 2);
-
-    // Shift held, then a pad: that pad sets the root and does not latch.
-    t.in.pads = 1u << 11; t.poll(20);
-    t.in.pads |= 1u << 7; t.poll(20);
-    t.in.pads = 1u << 11; t.poll(20);
-    CHECK(t.ui.tuning().root == 7);
-    CHECK(t.ui.latched() == 0b1001);
-    t.in.pads = 0; t.poll(20);
-
-    // And once shift is let go, pads latch notes again.
-    t.hold(7);
-    CHECK(t.ui.latched() == 0b10001001);
-    CHECK(t.ui.tuning().root == 7);
-
-    t.in.sw[0] = PanelInput::SwUp;   t.poll(); CHECK(t.ui.tuning().scale == 0);
+    t.in.sw[0] = PanelInput::SwUp;     t.poll(); CHECK(t.ui.tuning().scale == 0);
     t.in.sw[0] = PanelInput::SwCentre; t.poll(); CHECK(t.ui.tuning().scale == 1);
-    t.in.sw[0] = PanelInput::SwDown; t.poll(); CHECK(t.ui.tuning().scale == 2);
-    t.in.sw[1] = PanelInput::SwUp;   t.poll(); CHECK(t.ui.tuning().octave == 1);
-    t.in.sw[1] = PanelInput::SwDown; t.poll(); CHECK(t.ui.tuning().octave == -1);
-    CHECK(t.ui.tuning().root == 7);   // switches leave the root alone
+    t.in.sw[0] = PanelInput::SwDown;   t.poll(); CHECK(t.ui.tuning().scale == 2);
+    t.in.sw[1] = PanelInput::SwUp;     t.poll(); CHECK(t.ui.tuning().octave == 1);
+    t.in.sw[1] = PanelInput::SwDown;   t.poll(); CHECK(t.ui.tuning().octave == -1);
 
-    // The drone actually follows: the root pad now sounds at G.
+    // The drone really does follow the root pads: D up five semitones is G.
     Rig u;
-    u.in.pads = 1u << 11; u.poll(10);
-    u.in.pads |= 1u << 7; u.poll(10);
-    u.in.pads = 0; u.poll(10);
+    for (int i = 0; i < 5; i++) u.hold(11);
     u.in.knob[PanelInput::KnobDrone] = .8f;
     u.run(14.f);
     float l[kBlock], r[kBlock];
     Audio a;
     for (int i = 0; i < int(4.f * kSr / kBlock); i++) { u.engine.process(l, r, kBlock); append(a, l, r, kBlock); }
     const double f = peak_hz(spectrum(mono(a), 65536), 65536, 60, 115);
-    std::printf("   root pad after shift+7: %.2f Hz (G2 = %.2f)\n", f, tw::midi_hz(43.f));
+    std::printf("   root pad after 5 steps up: %.2f Hz (G2 = %.2f)\n", f, tw::midi_hz(43.f));
     CHECK(std::fabs(f / tw::midi_hz(43.f) - 1) < .02);
 }
 
@@ -196,7 +228,8 @@ void led()
 int main()
 {
     pads();
-    shift_and_switches();
+    root_and_clear();
+    switches();
     panel_to_engine();
     bad_touch_controller();
     ghosts();

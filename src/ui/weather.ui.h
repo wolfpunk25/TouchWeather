@@ -11,10 +11,11 @@ namespace tw {
 /*
 Turns the panel into the instrument.
 
-The eight analog inputs go straight to Params. The pads latch drone notes: tap
-one and it swells in and keeps sounding; tap it again and it fades. Switch A
-picks the scale, switch B the register, and shift+pad the root, and held notes
-glide to the new tuning rather than jumping.
+The eight analog inputs go straight to Params. The ten note pads latch
+drone notes: tap one and it swells in and keeps sounding; tap it again and it
+fades. Switch A picks the scale and switch B the register; the two small pads at
+the top step the root down and up a semitone, and held together clear everything
+(see ui/layout.h). Held notes glide to the new tuning rather than jumping.
 
 With Motion up, the UI also plays a little by itself: now and then it lets a
 ghost note into the drone, and takes it out again half a minute later. Ghosts
@@ -40,7 +41,8 @@ public:
 
 private:
     void _apply_tuning(const PanelInput& in);
-    void _pad(int role, bool shift);
+    void _pads(const PanelInput& in, float dt);
+    void _tap(int role);
     void _ghosts(float dt, float motion);
     void _push();
 
@@ -49,7 +51,9 @@ private:
     Engine& _engine;
     Tuning _tuning;
     uint16_t _user { 0 }, _ghost { 0 };
-    uint16_t _prev_seen { 0 };
+    uint16_t _down { 0 };                 // roles held at the last poll
+    float _clear_t { 0 };
+    bool _cleared { false };
     float _blink { 0 };
     float _ghost_clock { 40.f };
     float _ghost_life[Drone::kDegrees] {};

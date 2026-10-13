@@ -35,10 +35,7 @@ static Audio play(const Scene& s, const bool played)
                 if (t >= at && t < at + .001f) { in.pads_seen |= 1u << electrode; }
             };
             tap(6, 1); tap(14, 4); tap(22, 6); tap(30, 8);
-            if (t >= 40 && t < 40.1f) in.pads = 1u << 11;
-            if (t >= 40.1f && t < 40.2f) { in.pads = (1u << 11) | (1u << 7); }
-            if (t >= 40.2f) in.pads = 0;
-            tap(52, 10);
+            tap(40, 11); tap(44, 11); tap(48, 11);   // root up three semitones
             in.knob[PanelInput::KnobRain] = std::min(.7f, t / 60.f);
             in.knob[PanelInput::KnobWind] = std::min(.5f, t / 80.f);
         }
