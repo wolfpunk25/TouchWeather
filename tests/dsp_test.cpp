@@ -41,7 +41,7 @@ static void levels_and_spectra()
     CHECK(rows[0].centroid > 250 && rows[0].centroid < 3000);
     CHECK(rows[3].centroid > 250 && rows[3].centroid < 3000);
     CHECK(rows[2].centroid < 400);
-    CHECK(rows[1].centroid > 3000);
+    CHECK(rows[1].centroid > 1200);   // the splashes sit lower than the old chirps did
 }
 
 static void silence_and_taper()
@@ -349,6 +349,89 @@ static void reverb_behaviour()
     }
 }
 
+/* How peaky the tail's spectrum is, in dB: the deviation of the log magnitude
+   from its local average over 200 Hz - 6 kHz. A perfectly diffuse tail scores
+   about 5.6; the metallic ring of a sparse network scored 10. */
+static double ripple(const float amount)
+{
+    tw::Reverb rv;
+    rv.init(kSr);
+    rv.set(amount);
+    const size_t N = 131072;
+    std::vector<float> ir(N);
+    for (size_t i = 0; i < N; i++) {
+        float l, r;
+        rv.process(i == 0 ? 1.f : 0.f, i == 0 ? 1.f : 0.f, l, r);
+        ir[i] = l;
+    }
+    auto s = spectrum(ir, N);
+    const size_t lo = static_cast<size_t>(200 * N / kSr), hi = static_cast<size_t>(6000 * N / kSr);
+    std::vector<double> L(hi + 1);
+    for (size_t i = lo; i <= hi; i++) L[i] = 20 * std::log10(s[i] + 1e-12);
+    double acc = 0;
+    size_t n = 0;
+    const int w = 64;
+    for (size_t i = lo + w; i + w <= hi; i++) {
+        double m = 0;
+        for (int k = -w; k <= w; k++) m += L[i + k];
+        m /= 2 * w + 1;
+        acc += (L[i] - m) * (L[i] - m);
+        n++;
+    }
+    return std::sqrt(acc / n);
+}
+
+static void reverb_smoothness()
+{
+    std::printf("-- reverb is smooth, not metallic\n");
+    for (float a : { .2f, .6f, 1.f }) {
+        const double r = ripple(a);
+        std::printf("   knob %.1f: spectral ripple %.2f dB\n", a, r);
+        CHECKF(r < 8.0, "reverb ripple at %.1f is %.2f dB", a, r);
+    }
+}
+
+static void balance_with_drone()
+{
+    std::printf("-- the drone is not overpowered by a light touch of weather\n");
+    auto level = [](float tw::Params::* f, const float v) {
+        tw::Engine e;
+        e.init(kSr, kBlock);
+        tw::Params p;
+        p.*f = v;
+        p.volume = .8f;
+        e.drone().set(0b1001, tw::Tuning {});
+        e.set(p);
+        (void)render(e, 3.f);
+        return db(rms(mono(render(e, 40.f))));
+    };
+    const double drone = level(&tw::Params::drone, .5f);
+    for (auto [name, f] : { std::pair<const char*, float tw::Params::*> { "wind", &tw::Params::wind },
+                            { "rain", &tw::Params::rain }, { "ocean", &tw::Params::ocean } }) {
+        const double a = level(f, .1f), b = level(f, .3f);
+        std::printf("   %-6s at 0.1: %.1f dB, at 0.3: %.1f dB   (drone at 0.5: %.1f dB)\n", name, a, b, drone);
+        CHECKF(a < drone - 15, "%s at 0.1 is well under the drone", name);
+        CHECKF(b < drone - 5, "%s at 0.3 is still under the drone", name);
+    }
+}
+
+static void rain_is_not_chirps()
+{
+    std::printf("-- rain drops are splashes, not high chirps\n");
+    // Light rain: the drops dominate, so their spectrum is the drops'.
+    tw::Engine e;
+    e.init(kSr, kBlock);
+    e.set(solo(&tw::Params::rain, .2f));
+    (void)render(e, 2.f);
+    auto a = render(e, 40.f);
+    auto sp = avg_spectrum(mono(a), 8192);
+    const double c = centroid(sp, 8192);
+    const double hi = 1.0 - energy_below(sp, 8192, 4000);
+    std::printf("   light rain: centroid %.0f Hz, %.1f%% of energy above 4 kHz\n", c, hi * 100);
+    CHECK(c < 3000);
+    CHECK(hi < .15);
+}
+
 static void motion_behaviour()
 {
     std::printf("-- motion\n");
@@ -427,6 +510,9 @@ int main(int argc, char** argv)
     rain_behaviour();
     drone_behaviour();
     reverb_behaviour();
+    reverb_smoothness();
+    balance_with_drone();
+    rain_is_not_chirps();
     motion_behaviour();
     whole_instrument();
     speed();

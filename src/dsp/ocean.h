@@ -74,7 +74,7 @@ public:
 
         if (lvl <= 0.f && _last_gain <= 1e-5f) return;
 
-        const float amp = std::pow(lvl, 1.3f) * kGain;
+        const float amp = std::pow(lvl, 1.8f) * kGain;
         float* out[2] = { l, r };
         constexpr float kOffset[2] = { 0.f, .07f };   // the right ear hears it later
 
@@ -114,7 +114,7 @@ public:
     }
 
 private:
-    static constexpr float kGain = 1.4f;
+    static constexpr float kGain = .9f;
 
     struct Wave { float base { 10 }, period { 10 }, phase { 0 }; Rng rng; };
     Wave _wave[2];

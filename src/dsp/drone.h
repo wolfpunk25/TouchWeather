@@ -163,7 +163,7 @@ public:
     }
 
 private:
-    static constexpr float kGain = .30f;
+    static constexpr float kGain = .45f;
 
     static float blep(float t, const float dt)
     {

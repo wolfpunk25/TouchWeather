@@ -128,9 +128,9 @@ public:
     }
 
 private:
-    static constexpr float kEvent = .45f;
-    static constexpr float kBed = .12f;
-    static constexpr float kCrack = .35f;
+    static constexpr float kEvent = 1.3f;
+    static constexpr float kBed = .30f;
+    static constexpr float kCrack = .6f;
 
     struct Pulse { bool on { false }; float delay { 0 }, age { 0 }, attack { .1f }, peak { 0 }, level { 0 }, tau { 1 }; };
 

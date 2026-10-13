@@ -22,18 +22,18 @@ public:
     void init(const float sr)
     {
         _sr = sr;
-        static const int kLen[kLines] = { 1087, 1283, 1481, 1699, 1907, 2111, 2347, 2593 };
-        static const int kAp[4] = { 113, 163, 241, 337 };
+        static const int kLen[kLines] = { 1693, 1949, 2203, 2447, 2713, 2999, 3253, 3539 };
+        static const int kAp[kAps] = { 113, 163, 241, 337, 449, 577 };
         const float scale = sr / 48000.f;
         for (int i = 0; i < kLines; i++) {
             _len[i] = std::min(static_cast<int>(kLen[i] * scale), kSize - 64);
-            _lfo_hz[i] = .09f + .037f * static_cast<float>(i);
+            _lfo_hz[i] = .13f + .071f * static_cast<float>(i);
             _lfo_ph[i] = .131f * static_cast<float>(i);
             for (auto& s : _buf[i]) s = 0.f;
             _hp = 0.f;
             _lp[i] = 0.f;
         }
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < kAps; i++) {
             _ap_len[i] = std::min(static_cast<int>(kAp[i] * scale), kApSize - 1);
             for (auto& s : _ap[i]) s = 0.f;
         }
@@ -42,11 +42,11 @@ public:
         set(.5f);
     }
 
-    /* amount 0..1: the decay time, 1.5 s up to about 12 s. */
+    /* amount 0..1: the decay time, 1.5 s up to about 10 s. */
     void set(const float amount)
     {
         const float a = clampf(amount, 0.f, 1.f);
-        const float rt60 = 1.5f + 10.5f * std::pow(a, 1.3f);
+        const float rt60 = 1.5f + 14.5f * std::pow(a, 1.3f);   // nominal; the damping makes the real tail ~2/3 of it
         for (int i = 0; i < kLines; i++) {
             _g[i] = std::pow(10.f, -3.f * static_cast<float>(_len[i]) / (rt60 * _sr));
         }
@@ -64,11 +64,11 @@ public:
         float x = (in_l + in_r) * .5f;
         _hp += _hp_k * (x - _hp);
         x -= _hp;
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < kAps; i++) {
             const int rd = (_ap_w - _ap_len[i] + kApSize) % kApSize;
             const float d = _ap[i][rd];
-            const float y = d - .6f * x;
-            _ap[i][_ap_w] = x + .6f * d;   // buffers are per-stage, so one write head serves all
+            const float y = d - .65f * x;
+            _ap[i][_ap_w] = x + .65f * d;   // buffers are per-stage, so one write head serves all
             x = y;
         }
         _ap_w = (_ap_w + 1) % kApSize;
@@ -77,7 +77,7 @@ public:
         for (int i = 0; i < kLines; i++) {
             _lfo_ph[i] += _lfo_hz[i] / _sr;
             _lfo_ph[i] -= std::floor(_lfo_ph[i]);
-            const float pos = static_cast<float>(_len[i]) + 5.f * fast_sin(_lfo_ph[i]);
+            const float pos = static_cast<float>(_len[i]) + kModDepth * fast_sin(_lfo_ph[i]);
             const float rp = static_cast<float>(_w) - pos + static_cast<float>(kSize);
             const int i0 = static_cast<int>(rp);
             const float frac = rp - static_cast<float>(i0);
@@ -121,11 +121,13 @@ private:
        setting, so this brings noise through at about unity. */
     static constexpr float kOut = .5f * .63f;
     static constexpr int kSize = 4096;     // per line; a power of two
-    static constexpr int kApSize = 512;
+    static constexpr int kApSize = 1024;
+    static constexpr int kAps = 6;
+    static constexpr float kModDepth = 14.f;
 
     float _buf[kLines][kSize] {};
-    float _ap[4][kApSize] {};
-    int _len[kLines] {}, _ap_len[4] {};
+    float _ap[kAps][kApSize] {};
+    int _len[kLines] {}, _ap_len[kAps] {};
     float _g[kLines] {}, _lp[kLines] {}, _lfo_hz[kLines] {}, _lfo_ph[kLines] {};
     float _damp { .5f }, _sr { 48000 }, _hp { 0 }, _hp_k { .02f }, _out { kOut };
     int _w { 0 }, _ap_w { 0 };

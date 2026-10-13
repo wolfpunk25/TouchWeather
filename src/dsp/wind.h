@@ -31,7 +31,7 @@ public:
         if (level <= 0.f && _last_gain[0] <= 1e-5f && _last_gain[1] <= 1e-5f) return;
 
         const float lvl = clampf(level, 0.f, 1.f);
-        const float amp = std::pow(lvl, 1.5f) * kGain;
+        const float amp = std::pow(lvl, 2.f) * kGain;
         float* out[2] = { l, r };
 
         for (int c = 0; c < 2; c++) {
@@ -64,7 +64,7 @@ public:
     }
 
 private:
-    static constexpr float kGain = .9f;
+    static constexpr float kGain = .55f;
 
     struct Channel {
         Rng rng;
