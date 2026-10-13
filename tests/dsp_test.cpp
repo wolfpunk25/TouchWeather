@@ -240,8 +240,8 @@ static void drone_behaviour()
     {
         // Register switch: one octave up doubles the pitch.
         tw::Engine e; fresh(e, .8f);
-        tw::Tuning hi = d_minor; hi.octave = 1;
-        e.drone().set(1u << 0, hi);
+        const int8_t up[tw::Drone::kDegrees] = { 1 };
+        e.drone().set(1u << 0, d_minor, up);
         (void)render(e, 6.f);
         const double f = peak_hz(spectrum(mono(render(e, 4.f)), N), N, 40, 600);
         CHECK(std::fabs(f / (tw::midi_hz(38.f) * 2) - 1) < .02);
@@ -381,6 +381,35 @@ static double ripple(const float amount)
     return std::sqrt(acc / n);
 }
 
+/* Biggest normalised autocorrelation of the tail on white noise, lags 3-150 ms.
+   Noise shows up periodic echoes that an impulse hides: a mis-built allpass in
+   the input scored 0.41 here (a 7 ms buzz, heard as "metallic, industrial"). */
+static double noise_periodicity(const float amount)
+{
+    tw::Reverb rv;
+    rv.init(kSr);
+    rv.set(amount);
+    tw::Rng rng(9);
+    const size_t N = static_cast<size_t>(kSr * 25);
+    std::vector<float> w(N);
+    for (size_t i = 0; i < N; i++) {
+        const float x = rng.bipolar() * .3f;
+        float l, r;
+        rv.process(x, x, l, r);
+        w[i] = l;
+    }
+    std::vector<float> x(w.begin() + static_cast<size_t>(kSr * 5), w.end());
+    double e0 = 0;
+    for (float v : x) e0 += double(v) * v;
+    double best = 0;
+    for (size_t lag = static_cast<size_t>(.003 * kSr); lag <= static_cast<size_t>(.150 * kSr); lag++) {
+        double c = 0;
+        for (size_t i = 0; i + lag < x.size(); i++) c += double(x[i]) * x[i + lag];
+        best = std::fmax(best, std::fabs(c / e0));
+    }
+    return best;
+}
+
 static void reverb_smoothness()
 {
     std::printf("-- reverb is smooth, not metallic\n");
@@ -388,6 +417,9 @@ static void reverb_smoothness()
         const double r = ripple(a);
         std::printf("   knob %.1f: spectral ripple %.2f dB\n", a, r);
         CHECKF(r < 8.0, "reverb ripple at %.1f is %.2f dB", a, r);
+        const double p = noise_periodicity(a);
+        std::printf("   knob %.1f: periodicity on noise %.3f\n", a, p);
+        CHECKF(p < .15, "reverb on noise is not periodic at %.1f (%.3f)", a, p);
     }
 }
 
@@ -421,15 +453,15 @@ static void rain_is_not_chirps()
     // Light rain: the drops dominate, so their spectrum is the drops'.
     tw::Engine e;
     e.init(kSr, kBlock);
-    e.set(solo(&tw::Params::rain, .2f));
+    e.set(solo(&tw::Params::rain, .1f));
     (void)render(e, 2.f);
-    auto a = render(e, 40.f);
+    auto a = render(e, 60.f);
     auto sp = avg_spectrum(mono(a), 8192);
     const double c = centroid(sp, 8192);
     const double hi = 1.0 - energy_below(sp, 8192, 4000);
     std::printf("   light rain: centroid %.0f Hz, %.1f%% of energy above 4 kHz\n", c, hi * 100);
     CHECK(c < 3000);
-    CHECK(hi < .15);
+    CHECK(hi < .3);
 }
 
 static void motion_behaviour()

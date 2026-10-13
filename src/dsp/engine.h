@@ -125,8 +125,8 @@ public:
 private:
     static constexpr float kBus = 2.0f;        // generators are trimmed to mix, not to be heard alone
     static constexpr float kWet = 1.4f;
-    static constexpr float kThreshold = .22f;   // about -13 dBFS
-    static constexpr float kRatio = 3.f;
+    static constexpr float kThreshold = .2f;   // about -13 dBFS
+    static constexpr float kRatio = 4.f;
 
     Wind _wind;
     Rain _rain;

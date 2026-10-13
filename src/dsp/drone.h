@@ -23,14 +23,14 @@ constexpr int kStep[kCount][kNotes] = {
 struct Tuning {
     int root { 2 };        // pitch class, 0 = C ... 11 = B. D by default.
     int scale { 1 };       // index into scales::kStep
-    int octave { 0 };      // register shift, in octaves: -1, 0, +1
 };
 
-/* Pad n (0..9) is the nth step of the scale, running up two octaves from the root. */
-inline float degree_midi(const Tuning& t, const int degree)
+/* Pad n (0..9) is the nth step of the scale, running up two octaves from the root;
+   `octave` shifts that one note (each latched note keeps the octave it was played in). */
+inline float degree_midi(const Tuning& t, const int degree, const int octave = 0)
 {
     const int step = scales::kStep[t.scale][degree % scales::kNotes];
-    return static_cast<float>(36 + t.root + 12 * t.octave + step + 12 * (degree / scales::kNotes));
+    return static_cast<float>(36 + t.root + 12 * octave + step + 12 * (degree / scales::kNotes));
 }
 
 inline float midi_hz(const float m) { return 440.f * std::exp2((m - 69.f) / 12.f); }
@@ -69,13 +69,15 @@ public:
         }
     }
 
-    /* mask bit n = pad n latched. Cheap; call whenever either changes. */
-    void set(const uint16_t mask, const Tuning& t)
+    /* mask bit n = pad n latched, octave[n] = the octave that note was played in
+       (null = all in the middle one). Cheap; call whenever either changes. */
+    void set(const uint16_t mask, const Tuning& t, const int8_t* octave = nullptr)
     {
+        auto oct = [octave](const int degree) { return octave ? static_cast<int>(octave[degree]) : 0; };
         for (auto& v : _v) {
             if (!v.active()) continue;
             if (v.gate && !(mask & (1u << v.degree))) v.gate = false;
-            v.target = midi_hz(degree_midi(t, v.degree));
+            v.target = midi_hz(degree_midi(t, v.degree, oct(v.degree)));
         }
         for (int d = 0; d < kDegrees; d++) {
             if (!(mask & (1u << d))) continue;
@@ -100,7 +102,7 @@ public:
             slot->gate = true;
             slot->env = 0.f;
             slot->born = ++_serial;
-            slot->target = slot->freq = midi_hz(degree_midi(t, d));
+            slot->target = slot->freq = midi_hz(degree_midi(t, d, oct(d)));
             for (auto& p : slot->ph) p = 0.f;
         }
     }

@@ -23,7 +23,7 @@ public:
 
     /* How many drops have been started since init (for tests). */
     uint32_t drops() const { return _drops; }
-    static float drop_rate(const float level) { return 2.5f * std::exp(std::log(160.f) * level); }
+    static float drop_rate(const float level) { return 1.5f * std::exp(std::log(40.f) * level); }
 
     void process(const float level, float* l, float* r, const size_t n)
     {
@@ -104,14 +104,14 @@ private:
         d.phase = 0.f;
         // Small drops are higher and quicker; big ones thud lower and ring longer.
         const float size = _rng.uni();                                   // 0 small .. 1 big
-        const float centre = 2600.f * std::exp(std::log(.28f) * size);   // 2.6k .. 730 Hz
-        d.band.set(centre, 1.3f, _sr);
+        const float centre = 1800.f * std::exp(std::log(.25f) * size);   // 1.8k .. 450 Hz
+        d.band.set(centre, .8f, _sr);
         d.env = 1.f;
-        d.decay = std::exp(-1.f / (_rng.range(.006f, .016f) * (1.f + size) * _sr));
-        d.hz = 190.f + 520.f * (1.f - size);                              // the bubble
-        d.bub_env = .4f + .6f * size;
+        d.decay = std::exp(-1.f / (_rng.range(.010f, .024f) * (1.f + size) * _sr));
+        d.hz = 150.f + 330.f * (1.f - size);                              // the bubble
+        d.bub_env = .15f + .25f * size;
         d.bub_decay = std::exp(-1.f / (_rng.range(.02f, .045f) * _sr));
-        d.rise = .6f;
+        d.rise = .35f;
         d.chirp = 1.f;
         d.chirp_decay = std::exp(-1.f / (.03f * _sr));
         d.amp = .15f + .85f * _rng.uni() * _rng.uni();                   // mostly small, a few loud

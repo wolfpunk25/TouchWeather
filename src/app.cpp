@@ -163,8 +163,8 @@ void AppImpl::_log()
         static_cast<int>(_panel.knob[2] * 1000), static_cast<int>(_panel.knob[3] * 1000),
         static_cast<int>(_panel.knob[4] * 1000), static_cast<int>(_panel.knob[5] * 1000),
         static_cast<int>(_panel.knob[6] * 1000), static_cast<int>(_panel.knob[7] * 1000));
-    _hw.PrintLine("[state] latched 0x%03x ghosts 0x%03x root %d scale %d oct %d | cpu avg %d%% max %d%%",
-        _ui.latched(), _ui.ghosts(), _ui.tuning().root, _ui.tuning().scale, _ui.tuning().octave,
+    _hw.PrintLine("[state] latched 0x%03x ghosts 0x%03x root %d scale %d next-oct %d | cpu avg %d%% max %d%%",
+        _ui.latched(), _ui.ghosts(), _ui.tuning().root, _ui.tuning().scale, _ui.next_octave(),
         static_cast<int>(_cpu.GetAvgCpuLoad() * 100), static_cast<int>(_cpu.GetMaxCpuLoad() * 100));
     _cpu.Reset();
 }

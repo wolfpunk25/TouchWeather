@@ -8,6 +8,8 @@ void WeatherUI::init(const PanelInput& in)
 {
     _apply_tuning(in);
     _user = (1u << 0) | (1u << 3);   // root and fifth: an open drone out of the box
+    _stamp[0] = ++_clock;
+    _stamp[3] = ++_clock;
     _down = 0;
     _push();
 }
@@ -20,17 +22,17 @@ void WeatherUI::_apply_tuning(const PanelInput& in)
         case PanelInput::SwDown: _tuning.scale = 2; break;
         default:                 _tuning.scale = 1; break;
     }
-    // Switch B: the register.
+    // Switch B: the octave for the next note.
     switch (in.sw[1]) {
-        case PanelInput::SwUp:   _tuning.octave = 1; break;
-        case PanelInput::SwDown: _tuning.octave = -1; break;
-        default:                 _tuning.octave = 0; break;
+        case PanelInput::SwUp:   _oct_next = 1; break;
+        case PanelInput::SwDown: _oct_next = -1; break;
+        default:                 _oct_next = 0; break;
     }
 }
 
 void WeatherUI::_push()
 {
-    _engine.drone().set(_user | _ghost, _tuning);
+    _engine.drone().set(_user | _ghost, _tuning, _oct);
 }
 
 void WeatherUI::_tap(const int role)
@@ -38,8 +40,26 @@ void WeatherUI::_tap(const int role)
     _blink = .8f;
     const uint16_t bit = 1u << role;
     if (_ghost & bit) _ghost &= ~bit;   // tapping a ghost sends it away
-    else _user ^= bit;
+    else if (_user & bit) _user &= ~bit;
+    else _latch(role);
     _push();
+}
+
+void WeatherUI::_latch(const int role)
+{
+    _user |= 1u << role;
+    _oct[role] = _oct_next;
+    _stamp[role] = ++_clock;
+
+    // Two at a time: the oldest note gives way to the newest.
+    while (__builtin_popcount(_user) > kMaxNotes) {
+        int oldest = -1;
+        for (int d = 0; d < Drone::kDegrees; d++) {
+            if (!(_user & (1u << d)) || d == role) continue;
+            if (oldest < 0 || _stamp[d] < _stamp[oldest]) oldest = d;
+        }
+        _user &= ~(1u << oldest);
+    }
 }
 
 void WeatherUI::_pads(const PanelInput& in, const float dt)
@@ -103,6 +123,7 @@ void WeatherUI::_ghosts(const float dt, const float motion)
                     if (taken & (1u << d)) continue;
                     if (pick-- == 0) {
                         _ghost |= 1u << d;
+                        _oct[d] = _oct_next;
                         _ghost_life[d] = _rng.range(30.f, 80.f);
                         changed = true;
                         break;
@@ -132,7 +153,7 @@ void WeatherUI::poll(const PanelInput& in, const float dt)
     _apply_tuning(in);
     _tuning.root = root;
 
-    bool dirty = _tuning.scale != before.scale || _tuning.octave != before.octave;
+    bool dirty = _tuning.scale != before.scale;
 
     if (in.pads_ok) _pads(in, dt);
     else { _down = 0; _clear_t = 0.f; _cleared = false; }
